@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — Noá Premium</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;1,700&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --black:      #0A0A0A;
+      --bg:         #111111;
+      --bg-2:       #1A1612;
+      --bg-card:    #161210;
+      --tomato:     #992020;
+      --tomato-lt:  #B52828;
+      --gold:       #C49A1A;
+      --gold-lt:    #D4AE38;
+      --text:       #F0EBE3;
+      --text-muted: #9A9086;
+      --border:     rgba(201,168,76,0.15);
+      --radius:     4px;
+      --trans:      0.25s ease;
+    }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html { font-size: 16px; }
+    body {
+      font-family: 'Montserrat', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { cursor: pointer; font-family: inherit; }
+    img { display: block; max-width: 100%; }
+
+    /* === LOGIN === */
+    .login-screen {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+    .login-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      padding: 3rem 2.5rem;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+    .login-box img { height: 80px; margin: 0 auto 1.5rem; }
+    .login-box h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.5rem;
+      margin-bottom: 0.4rem;
+    }
+    .login-box p { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 2rem; }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      text-align: left;
+      margin-bottom: 1.2rem;
+    }
+    .field label { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); }
+    .field input, .field select, .field textarea {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.75rem 1rem;
+      font-family: inherit;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color var(--trans);
+      width: 100%;
+    }
+    .field textarea { resize: vertical; min-height: 80px; }
+    .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--gold); }
+    .field select option { background: var(--bg-2); }
+
+    .login-err { font-size: 0.8rem; color: var(--tomato-lt); margin-bottom: 1rem; min-height: 1rem; }
+
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.8rem 1.8rem; font-family: inherit; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; border: none; cursor: pointer; transition: all var(--trans); }
+    .btn-red { background: var(--tomato); color: var(--text); }
+    .btn-red:hover { background: var(--tomato-lt); }
+    .btn-gold { background: transparent; border: 1px solid var(--gold); color: var(--gold); }
+    .btn-gold:hover { background: var(--gold); color: var(--black); }
+    .btn-danger { background: transparent; border: 1px solid rgba(153,32,32,0.4); color: var(--tomato-lt); font-size: 0.72rem; padding: 0.4rem 0.8rem; }
+    .btn-danger:hover { background: var(--tomato); border-color: var(--tomato); color: var(--text); }
+    .btn-sm { padding: 0.45rem 1rem; font-size: 0.72rem; }
+    .btn-full { width: 100%; }
+
+    /* === ADMIN LAYOUT === */
+    .admin-wrap { display: none; }
+    .admin-topbar {
+      background: rgba(10,10,10,0.95);
+      border-bottom: 1px solid var(--border);
+      padding: 0.8rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .admin-topbar img { height: 40px; }
+    .admin-topbar h1 { font-family: 'Playfair Display', serif; font-size: 1.1rem; flex: 1; }
+    .admin-topbar .topbar-meta { font-size: 0.72rem; color: var(--text-muted); }
+
+    .admin-main { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+    .admin-grid { display: grid; grid-template-columns: 380px 1fr; gap: 2rem; align-items: start; }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      padding: 1.8rem;
+    }
+    .card h3 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.15rem;
+      margin-bottom: 1.4rem;
+      padding-bottom: 0.8rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--gold);
+    }
+
+    button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 900px) { .admin-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 600px) {
+      .admin-topbar { padding: 0.7rem 1rem; gap: 0.8rem; }
+      .admin-topbar img { height: 32px; }
+      .admin-topbar h1 { font-size: 0.9rem; }
+      .admin-main { padding: 1.2rem 1rem 3rem; }
+      .card { padding: 1.2rem; }
+      .prod-item { grid-template-columns: 48px 1fr; gap: 0.6rem; }
+      .prod-actions { grid-column: 1 / -1; justify-content: flex-start; padding-top: 0.4rem; }
+      .btn { min-height: 44px; }
+      .btn-danger { min-height: 40px; padding: 0.5rem 1rem; }
+      .field input, .field select, .field textarea { font-size: 1rem; padding: 0.85rem 1rem; }
+    }
+    @media (max-width: 500px) { .form-row { grid-template-columns: 1fr; } }
+
+    /* === PRODUCT LIST === */
+    .prod-list { display: flex; flex-direction: column; gap: 0; }
+    .prod-item {
+      display: grid;
+      grid-template-columns: 56px 1fr auto;
+      gap: 0.8rem;
+      align-items: center;
+      padding: 0.9rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .prod-item:last-child { border-bottom: none; }
+    .prod-thumb {
+      width: 56px;
+      height: 56px;
+      background: var(--bg-2);
+      background-size: cover;
+      background-position: center;
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .prod-info { overflow: hidden; }
+    .prod-name { font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .prod-meta { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.15rem; }
+    .prod-price { font-size: 0.82rem; color: var(--gold); font-weight: 600; margin-top: 0.1rem; }
+    .prod-actions { display: flex; gap: 0.4rem; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+
+    .badge-cat {
+      display: inline-block;
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      padding: 0.15rem 0.5rem;
+      border: 1px solid var(--border);
+      color: var(--gold);
+      background: rgba(196,154,26,0.08);
+      vertical-align: middle;
+    }
+
+    .toggle-active {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 0.35rem 0.7rem;
+      border: 1px solid;
+      cursor: pointer;
+      background: transparent;
+      font-family: inherit;
+      transition: all var(--trans);
+    }
+    .toggle-active.on { border-color: rgba(196,154,26,0.4); color: var(--gold-lt); }
+    .toggle-active.off { border-color: rgba(154,144,134,0.3); color: var(--text-muted); }
+    .toggle-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: currentColor;
+    }
+
+    .empty-list { padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
+
+    .img-preview {
+      width: 100%;
+      aspect-ratio: 16/9;
+      background: var(--bg-2);
+      background-size: cover;
+      background-position: center;
+      border: 1px dashed var(--border);
+      margin-bottom: 0.8rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+    }
+
+    .section-divider { margin: 2rem 0 1.4rem; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.25em; text-transform: uppercase; color: var(--text-muted); display: flex; align-items: center; gap: 1rem; }
+    .section-divider::before, .section-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    .alert {
+      padding: 0.75rem 1rem;
+      font-size: 0.82rem;
+      margin-bottom: 1rem;
+      border-left: 3px solid;
+      display: none;
+    }
+    .alert.success { border-color: #3a9e60; background: rgba(58,158,96,0.08); color: #5acd80; }
+    .alert.error   { border-color: var(--tomato); background: rgba(153,32,32,0.08); color: var(--tomato-lt); }
+    .alert.show    { display: block; }
+
+    .link-back { font-size: 0.75rem; color: var(--text-muted); transition: color var(--trans); }
+    .link-back:hover { color: var(--gold); }
+
+    .count-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px; height: 22px;
+      background: var(--tomato);
+      border-radius: 50%;
+      font-size: 0.7rem;
+      font-weight: 700;
+      vertical-align: middle;
+      margin-left: 0.4rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===== LOGIN ===== -->
+  <div class="login-screen" id="loginScreen">
+    <div class="login-box">
+      <img src="LOGO.png" alt="Noá Premium" />
+      <h2>Painel Admin</h2>
+      <p>Acesso restrito à equipe Noá Premium</p>
+      <div class="field">
+        <label>Senha</label>
+        <input type="password" id="loginPass" placeholder="Digite a senha..." autocomplete="current-password" />
+      </div>
+      <div class="login-err" id="loginErr"></div>
+      <button class="btn btn-red btn-full" id="loginBtn">Entrar</button>
+    </div>
+  </div>
+
+  <!-- ===== ADMIN ===== -->
+  <div class="admin-wrap" id="adminWrap">
+    <div class="admin-topbar">
+      <img src="LOGO.png" alt="Noá Premium" />
+      <h1>Catálogo — Painel Admin</h1>
+      <a href="index.html" class="link-back">← Ver site</a>
+      <button class="btn btn-danger btn-sm" id="logoutBtn">Sair</button>
+    </div>
+
+    <div class="admin-main">
+      <div class="admin-grid">
+
+        <!-- FORM ADD/EDIT -->
+        <div class="card">
+          <h3 id="formTitle">Adicionar Produto</h3>
+          <div class="alert" id="formAlert"></div>
+          <input type="hidden" id="editId" />
+
+          <div class="img-preview" id="imgPreview">
+            <span>Pré-visualização da imagem</span>
+          </div>
+
+          <div class="field">
+            <label>Imagem do Produto</label>
+            <div style="display:flex;gap:0.5rem;align-items:stretch;">
+              <input type="url" id="fImg" placeholder="Cole uma URL ou use o botão →" style="flex:1" />
+              <label class="btn btn-gold btn-sm" style="cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:0.4rem;" title="Fazer upload do computador">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Upload
+                <input type="file" id="fImgFile" accept="image/*" style="display:none" />
+              </label>
+            </div>
+            <span style="font-size:0.68rem;color:var(--text-muted);margin-top:0.3rem;display:block;">A imagem é comprimida e salva automaticamente.</span>
+          </div>
+
+          <div class="field">
+            <label>Nome do Produto *</label>
+            <input type="text" id="fName" placeholder="Ex: Picanha, Wagyu..." />
+          </div>
+
+          <div class="form-row">
+            <div class="field">
+              <label>Categoria *</label>
+              <select id="fCat">
+                <option value="bovino">Bovino</option>
+                <option value="especial">Especial</option>
+                <option value="gourmet">Gourmet</option>
+                <option value="diaadia">Dia a Dia</option>
+                <option value="emporio">Empório</option>
+                <option value="suinos">Suínos</option>
+                <option value="cordeiros">Cordeiros</option>
+                <option value="frango">Frango</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Unidade *</label>
+              <select id="fUnit">
+                <option value="kg">Por kg</option>
+                <option value="unidade">Por unidade</option>
+                <option value="pacote">Por pacote</option>
+                <option value="bandeja">Por bandeja</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Descrição</label>
+            <textarea id="fDesc" placeholder="Breve descrição do corte..."></textarea>
+          </div>
+
+          <div class="form-row">
+            <div class="field">
+              <label>Preço (R$) — opcional</label>
+              <input type="number" id="fPrice" min="0" step="0.01" placeholder="0,00" />
+            </div>
+            <div class="field">
+              <label>Destaque</label>
+              <select id="fFeatured">
+                <option value="0">Normal</option>
+                <option value="1">Em destaque ★</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:0.6rem;margin-top:0.5rem;">
+            <button class="btn btn-red" id="saveBtn" style="flex:1">Salvar Produto</button>
+            <button class="btn btn-gold btn-sm" id="cancelEditBtn" style="display:none">Cancelar</button>
+          </div>
+        </div>
+
+        <!-- PRODUCT LIST -->
+        <div class="card">
+          <h3>
+            Produtos cadastrados
+            <span class="count-badge" id="prodCount">0</span>
+          </h3>
+          <div id="prodList" class="prod-list">
+            <div class="empty-list">Nenhum produto cadastrado ainda.</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (() => {
+    'use strict';
+
+    const ADMIN_PASS = 'noa2025';
+    const LS_PRODUCTS = 'noa_products';
+
+    // ── Login ──────────────────────────────────────────
+    const loginScreen = document.getElementById('loginScreen');
+    const adminWrap   = document.getElementById('adminWrap');
+    const loginPass   = document.getElementById('loginPass');
+    const loginBtn    = document.getElementById('loginBtn');
+    const loginErr    = document.getElementById('loginErr');
+    const logoutBtn   = document.getElementById('logoutBtn');
+
+    function checkSession() {
+      if (sessionStorage.getItem('noa_admin') === '1') {
+        loginScreen.style.display = 'none';
+        adminWrap.style.display = 'block';
+        renderList();
+      }
+    }
+
+    loginBtn.addEventListener('click', () => {
+      if (loginPass.value === ADMIN_PASS) {
+        sessionStorage.setItem('noa_admin', '1');
+        loginErr.textContent = '';
+        loginScreen.style.display = 'none';
+        adminWrap.style.display = 'block';
+        renderList();
+      } else {
+        loginErr.textContent = 'Senha incorreta. Tente novamente.';
+        loginPass.value = '';
+        loginPass.focus();
+      }
+    });
+
+    loginPass.addEventListener('keydown', e => { if (e.key === 'Enter') loginBtn.click(); });
+
+    logoutBtn.addEventListener('click', () => {
+      sessionStorage.removeItem('noa_admin');
+      location.reload();
+    });
+
+    // ── Storage helpers ────────────────────────────────
+    function loadProducts() {
+      try { return JSON.parse(localStorage.getItem(LS_PRODUCTS)) || []; }
+      catch { return []; }
+    }
+    function saveProducts(list) {
+      localStorage.setItem(LS_PRODUCTS, JSON.stringify(list));
+    }
+    function nextId(list) {
+      return list.length ? Math.max(...list.map(p => p.id)) + 1 : 1;
+    }
+
+    // ── Form ───────────────────────────────────────────
+    const editId      = document.getElementById('editId');
+    const fImg        = document.getElementById('fImg');
+    const fName       = document.getElementById('fName');
+    const fCat        = document.getElementById('fCat');
+    const fUnit       = document.getElementById('fUnit');
+    const fDesc       = document.getElementById('fDesc');
+    const fPrice      = document.getElementById('fPrice');
+    const fFeatured   = document.getElementById('fFeatured');
+    const saveBtn     = document.getElementById('saveBtn');
+    const cancelBtn   = document.getElementById('cancelEditBtn');
+    const formTitle   = document.getElementById('formTitle');
+    const formAlert   = document.getElementById('formAlert');
+    const imgPreview  = document.getElementById('imgPreview');
+
+    fImg.addEventListener('input', () => {
+      const url = fImg.value.trim();
+      if (url) {
+        imgPreview.style.backgroundImage = `url(${url})`;
+        imgPreview.innerHTML = '';
+      } else {
+        imgPreview.style.backgroundImage = '';
+        imgPreview.innerHTML = '<span>Pré-visualização da imagem</span>';
+      }
+    });
+
+    // ── Upload & compress image ────────────────────────
+    const fImgFile = document.getElementById('fImgFile');
+    fImgFile.addEventListener('change', () => {
+      const file = fImgFile.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = e => {
+        const original = new Image();
+        original.onload = () => {
+          // Resize to max 800px wide keeping aspect ratio
+          const MAX = 800;
+          let w = original.width;
+          let h = original.height;
+          if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+
+          const canvas = document.createElement('canvas');
+          canvas.width  = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(original, 0, 0, w, h);
+
+          // Compress to JPEG quality 0.82
+          const base64 = canvas.toDataURL('image/jpeg', 0.82);
+
+          fImg.value = base64;
+          imgPreview.style.backgroundImage = `url(${base64})`;
+          imgPreview.innerHTML = '';
+
+          // Show size info
+          const kb = Math.round(base64.length * 0.75 / 1024);
+          imgPreview.setAttribute('title', `${w}×${h}px — ${kb} KB`);
+        };
+        original.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+      fImgFile.value = ''; // reset so same file can be re-selected
+    });
+
+    function showAlert(msg, type = 'success') {
+      formAlert.textContent = msg;
+      formAlert.className = `alert ${type} show`;
+      setTimeout(() => { formAlert.className = 'alert'; }, 3000);
+    }
+
+    function clearForm() {
+      editId.value = '';
+      fImg.value = '';
+      fName.value = '';
+      fCat.value = 'bovino';
+      fUnit.value = 'kg';
+      fDesc.value = '';
+      fPrice.value = '';
+      fFeatured.value = '0';
+      imgPreview.style.backgroundImage = '';
+      imgPreview.innerHTML = '<span>Pré-visualização da imagem</span>';
+      formTitle.textContent = 'Adicionar Produto';
+      saveBtn.textContent = 'Salvar Produto';
+      cancelBtn.style.display = 'none';
+    }
+
+    saveBtn.addEventListener('click', () => {
+      const name = fName.value.trim();
+      const img  = fImg.value.trim();
+      if (!name) { showAlert('Informe o nome do produto.', 'error'); return; }
+
+      const list = loadProducts();
+      const id   = editId.value ? parseInt(editId.value) : null;
+
+      const prod = {
+        id:       id || nextId(list),
+        name,
+        cat:      fCat.value,
+        unit:     fUnit.value,
+        desc:     fDesc.value.trim(),
+        price:    fPrice.value ? parseFloat(fPrice.value) : null,
+        img:      img || 'https://images.unsplash.com/photo-1529694157872-4e0c0f3b238b?w=600&q=80',
+        featured: fFeatured.value === '1',
+        active:   true,
+      };
+
+      if (id) {
+        const idx = list.findIndex(p => p.id === id);
+        if (idx >= 0) {
+          prod.active = list[idx].active; // preserve active state
+          list.splice(idx, 1, prod);
+        }
+        showAlert('Produto atualizado com sucesso!');
+      } else {
+        list.push(prod);
+        showAlert('Produto adicionado com sucesso!');
+      }
+
+      saveProducts(list);
+      clearForm();
+      renderList();
+    });
+
+    cancelBtn.addEventListener('click', clearForm);
+
+    function editProduct(id) {
+      const list = loadProducts();
+      const prod = list.find(p => p.id === id);
+      if (!prod) return;
+      editId.value    = prod.id;
+      fImg.value      = prod.img;
+      fName.value     = prod.name;
+      fCat.value      = prod.cat;
+      fUnit.value     = prod.unit || 'kg';
+      fDesc.value     = prod.desc || '';
+      fPrice.value    = prod.price || '';
+      fFeatured.value = prod.featured ? '1' : '0';
+      imgPreview.style.backgroundImage = `url(${prod.img})`;
+      imgPreview.innerHTML = '';
+      formTitle.textContent = 'Editar Produto';
+      saveBtn.textContent = 'Atualizar Produto';
+      cancelBtn.style.display = 'inline-flex';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function deleteProduct(id) {
+      if (!confirm('Excluir este produto do catálogo?')) return;
+      const list = loadProducts().filter(p => p.id !== id);
+      saveProducts(list);
+      renderList();
+    }
+
+    function toggleActive(id) {
+      const list = loadProducts();
+      const prod = list.find(p => p.id === id);
+      if (prod) { prod.active = !prod.active; saveProducts(list); renderList(); }
+    }
+
+    // ── Render list ────────────────────────────────────
+    const prodList  = document.getElementById('prodList');
+    const prodCount = document.getElementById('prodCount');
+
+    const CAT_LABEL = { bovino: 'Bovino', especial: 'Especial', gourmet: 'Gourmet', diaadia: 'Dia a Dia', emporio: 'Empório', suinos: 'Suínos', cordeiros: 'Cordeiros', frango: 'Frango' };
+    const UNIT_LABEL = { kg: 'por kg', unidade: 'por unidade', pacote: 'por pacote', bandeja: 'por bandeja' };
+
+    function renderList() {
+      const list = loadProducts();
+      prodCount.textContent = list.length;
+
+      if (!list.length) {
+        prodList.innerHTML = '<div class="empty-list">Nenhum produto cadastrado ainda.</div>';
+        return;
+      }
+
+      prodList.innerHTML = list.map(p => `
+        <div class="prod-item">
+          <div class="prod-thumb" style="background-image:url(${p.img})"></div>
+          <div class="prod-info">
+            <div class="prod-name">${p.name} ${p.featured ? '★' : ''}</div>
+            <div class="prod-meta">
+              <span class="badge-cat">${CAT_LABEL[p.cat] || p.cat}</span>
+              ${UNIT_LABEL[p.unit] || p.unit}
+            </div>
+            ${p.price ? `<div class="prod-price">R$ ${p.price.toFixed(2).replace('.', ',')}</div>` : ''}
+          </div>
+          <div class="prod-actions">
+            <button class="toggle-active ${p.active ? 'on' : 'off'}" onclick="adminActions.toggle(${p.id})">
+              <span class="toggle-dot"></span>${p.active ? 'Ativo' : 'Oculto'}
+            </button>
+            <button class="btn btn-gold btn-sm" onclick="adminActions.edit(${p.id})">Editar</button>
+            <button class="btn btn-danger" onclick="adminActions.del(${p.id})">Excluir</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // expose to inline handlers
+    window.adminActions = { edit: editProduct, del: deleteProduct, toggle: toggleActive };
+
+    // ── Init ───────────────────────────────────────────
+    checkSession();
+  })();
+  </script>
+</body>
+</html>
