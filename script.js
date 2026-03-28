@@ -614,11 +614,13 @@
   const TIPO_MULT = { leve: 0.7, padrao: 1, pesado: 1.35 };
 
   function calcular() {
+    const resTotal = document.getElementById('result-total');
+    if (!resTotal) return; // não estamos na página da calculadora
+
     const mult   = TIPO_MULT[STATE.tipo];
     const checks = document.querySelectorAll('.calc-cortes-check input[type="checkbox"]:checked');
     const list   = document.getElementById('result-list');
     const resKg  = document.getElementById('result-kg');
-    const resTotal = document.getElementById('result-total');
 
     const total = STATE.men + STATE.women + STATE.kids;
     resTotal.textContent = total;
