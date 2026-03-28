@@ -93,18 +93,12 @@
     { id:9, name:'Prime Rib',  cat:'especial',unit:'kg',      desc:'Corte nobre com osso, generosa marmorização e sabor robusto. Para os grandes momentos à mesa.',          price:null, img:'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=600&q=80', featured:false, active:true },
   ];
 
-  function loadProducts() {
-    try {
-      const stored = JSON.parse(localStorage.getItem(LS_PRODUCTS));
-      return stored && stored.length ? stored : null;
-    } catch { return null; }
-  }
+  // ── Cache em memória (preenchido por initFromDB) ──
+  let _productsCache = null;
+  let _promosCache   = null;
 
   function getProducts() {
-    const stored = loadProducts();
-    if (stored) return stored;
-    localStorage.setItem(LS_PRODUCTS, JSON.stringify(DEFAULT_PRODUCTS));
-    return DEFAULT_PRODUCTS;
+    return _productsCache || DEFAULT_PRODUCTS.slice();
   }
 
   // ── Cart state ──
@@ -353,15 +347,11 @@
     });
   }
 
-  // ── Init catalog & badge ──
-  renderCatalog();
-  updateCartBadge();
-
   // ── Promoções da Semana ──
   const LS_PROMOS = 'noa_promos';
 
   function loadPromos() {
-    try { return JSON.parse(localStorage.getItem(LS_PROMOS)) || []; } catch { return []; }
+    return _promosCache || [];
   }
 
   const promosSection  = document.getElementById('promosSection');
@@ -562,8 +552,50 @@
     return [...base, ...extras];
   }
 
-  renderPromos();
-  window.addEventListener('storage', () => { renderPromos(); });
+  // ── Init: carrega dados do Firestore (ou localStorage como fallback) ──
+  async function initFromDB() {
+    if (typeof db !== 'undefined') {
+      try {
+        // Produtos
+        const pSnap = await db.collection('noa_products').orderBy('id').get();
+        if (pSnap.empty) {
+          // Semente inicial com DEFAULT_PRODUCTS
+          const batch = db.batch();
+          DEFAULT_PRODUCTS.forEach(p =>
+            batch.set(db.collection('noa_products').doc(String(p.id)), p)
+          );
+          await batch.commit();
+          _productsCache = DEFAULT_PRODUCTS.slice();
+        } else {
+          _productsCache = pSnap.docs.map(d => d.data());
+        }
+        // Promoções
+        const rSnap = await db.collection('noa_promos').orderBy('id').get();
+        _promosCache = rSnap.docs.map(d => d.data());
+      } catch (e) {
+        console.warn('Firebase indisponível, usando fallback local:', e);
+        _productsCache = (() => {
+          try { const s = JSON.parse(localStorage.getItem(LS_PRODUCTS)); return s && s.length ? s : DEFAULT_PRODUCTS.slice(); } catch { return DEFAULT_PRODUCTS.slice(); }
+        })();
+        _promosCache = (() => {
+          try { return JSON.parse(localStorage.getItem(LS_PROMOS)) || []; } catch { return []; }
+        })();
+      }
+    } else {
+      // Firebase não configurado — fallback para localStorage
+      _productsCache = (() => {
+        try { const s = JSON.parse(localStorage.getItem(LS_PRODUCTS)); return s && s.length ? s : DEFAULT_PRODUCTS.slice(); } catch { return DEFAULT_PRODUCTS.slice(); }
+      })();
+      _promosCache = (() => {
+        try { return JSON.parse(localStorage.getItem(LS_PROMOS)) || []; } catch { return []; }
+      })();
+    }
+    renderCatalog();
+    updateCartBadge();
+    renderPromos();
+  }
+
+  initFromDB();
 
 
   // ===== PARALLAX on hero (desktop only) =====

@@ -454,12 +454,16 @@
     </div>
   </div>
 
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+
   <script>
   (() => {
     'use strict';
 
     const ADMIN_PASS = 'noa2025';
-    const LS_PRODUCTS = 'noa_products';
 
     // ── Login ──────────────────────────────────────────
     const loginScreen = document.getElementById('loginScreen');
@@ -469,23 +473,23 @@
     const loginErr    = document.getElementById('loginErr');
     const logoutBtn   = document.getElementById('logoutBtn');
 
-    function checkSession() {
+    async function checkSession() {
       if (sessionStorage.getItem('noa_admin') === '1') {
         loginScreen.style.display = 'none';
         adminWrap.style.display = 'block';
-        renderList();
-        renderPromoList();
+        await renderList();
+        await renderPromoList();
       }
     }
 
-    loginBtn.addEventListener('click', () => {
+    loginBtn.addEventListener('click', async () => {
       if (loginPass.value === ADMIN_PASS) {
         sessionStorage.setItem('noa_admin', '1');
         loginErr.textContent = '';
         loginScreen.style.display = 'none';
         adminWrap.style.display = 'block';
-        renderList();
-        renderPromoList();
+        await renderList();
+        await renderPromoList();
       } else {
         loginErr.textContent = 'Senha incorreta. Tente novamente.';
         loginPass.value = '';
@@ -500,15 +504,24 @@
       location.reload();
     });
 
-    // ── Storage helpers ────────────────────────────────
-    function loadProducts() {
-      try { return JSON.parse(localStorage.getItem(LS_PRODUCTS)) || []; }
-      catch { return []; }
+    // ── Storage helpers (Firestore) ────────────────────────────
+    async function loadProducts() {
+      const snap = await db.collection('noa_products').orderBy('id').get();
+      return snap.docs.map(d => d.data());
     }
-    function saveProducts(list) {
-      localStorage.setItem(LS_PRODUCTS, JSON.stringify(list));
+    async function saveProduct(prod) {
+      await db.collection('noa_products').doc(String(prod.id)).set(prod);
     }
-    function nextId(list) {
+    async function deleteProductDB(id) {
+      await db.collection('noa_products').doc(String(id)).delete();
+    }
+    async function toggleProductDB(id) {
+      const ref = db.collection('noa_products').doc(String(id));
+      const doc = await ref.get();
+      if (doc.exists) await ref.update({ active: !doc.data().active });
+    }
+    async function nextId() {
+      const list = await loadProducts();
       return list.length ? Math.max(...list.map(p => p.id)) + 1 : 1;
     }
 
@@ -599,16 +612,18 @@
       cancelBtn.style.display = 'none';
     }
 
-    saveBtn.addEventListener('click', () => {
+    saveBtn.addEventListener('click', async () => {
       const name = fName.value.trim();
       const img  = fImg.value.trim();
       if (!name) { showAlert('Informe o nome do produto.', 'error'); return; }
 
-      const list = loadProducts();
-      const id   = editId.value ? parseInt(editId.value) : null;
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Salvando...';
+
+      const existingId = editId.value ? parseInt(editId.value) : null;
 
       const prod = {
-        id:       id || nextId(list),
+        id:       existingId || await nextId(),
         name,
         cat:      fCat.value,
         unit:     fUnit.value,
@@ -619,27 +634,27 @@
         active:   true,
       };
 
-      if (id) {
-        const idx = list.findIndex(p => p.id === id);
-        if (idx >= 0) {
-          prod.active = list[idx].active; // preserve active state
-          list.splice(idx, 1, prod);
-        }
+      if (existingId) {
+        // Preservar estado active ao editar
+        const list = await loadProducts();
+        const old  = list.find(p => p.id === existingId);
+        if (old) prod.active = old.active;
+        await saveProduct(prod);
         showAlert('Produto atualizado com sucesso!');
       } else {
-        list.push(prod);
+        await saveProduct(prod);
         showAlert('Produto adicionado com sucesso!');
       }
 
-      saveProducts(list);
+      saveBtn.disabled = false;
       clearForm();
-      renderList();
+      await renderList();
     });
 
     cancelBtn.addEventListener('click', clearForm);
 
-    function editProduct(id) {
-      const list = loadProducts();
+    async function editProduct(id) {
+      const list = await loadProducts();
       const prod = list.find(p => p.id === id);
       if (!prod) return;
       editId.value    = prod.id;
@@ -658,17 +673,15 @@
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    function deleteProduct(id) {
+    async function deleteProduct(id) {
       if (!confirm('Excluir este produto do catálogo?')) return;
-      const list = loadProducts().filter(p => p.id !== id);
-      saveProducts(list);
-      renderList();
+      await deleteProductDB(id);
+      await renderList();
     }
 
-    function toggleActive(id) {
-      const list = loadProducts();
-      const prod = list.find(p => p.id === id);
-      if (prod) { prod.active = !prod.active; saveProducts(list); renderList(); }
+    async function toggleActive(id) {
+      await toggleProductDB(id);
+      await renderList();
     }
 
     // ── Render list ────────────────────────────────────
@@ -678,8 +691,8 @@
     const CAT_LABEL = { bovino: 'Bovino', especial: 'Especial', gourmet: 'Gourmet', diaadia: 'Dia a Dia', emporio: 'Empório', suinos: 'Suínos', cordeiros: 'Cordeiros', frango: 'Frango' };
     const UNIT_LABEL = { kg: 'por kg', unidade: 'por unidade', pacote: 'por pacote', bandeja: 'por bandeja' };
 
-    function renderList() {
-      const list = loadProducts();
+    async function renderList() {
+      const list = await loadProducts();
       prodCount.textContent = list.length;
 
       if (!list.length) {
@@ -712,14 +725,26 @@
     // expose to inline handlers
     window.adminActions = { edit: editProduct, del: deleteProduct, toggle: toggleActive };
 
-    // ── PROMOÇÕES DA SEMANA ──────────────────────────────
-    const LS_PROMOS = 'noa_promos';
-
-    function loadPromos() {
-      try { return JSON.parse(localStorage.getItem(LS_PROMOS)) || []; } catch { return []; }
+    // ── PROMOÇÕES DA SEMANA (Firestore) ───────────────────────
+    async function loadPromos() {
+      const snap = await db.collection('noa_promos').orderBy('id').get();
+      return snap.docs.map(d => d.data());
     }
-    function savePromos(list) { localStorage.setItem(LS_PROMOS, JSON.stringify(list)); }
-    function nextPromoId(list) { return list.length ? Math.max(...list.map(p => p.id)) + 1 : 1; }
+    async function savePromo(promo) {
+      await db.collection('noa_promos').doc(String(promo.id)).set(promo);
+    }
+    async function deletePromoDB(id) {
+      await db.collection('noa_promos').doc(String(id)).delete();
+    }
+    async function togglePromoDB(id) {
+      const ref = db.collection('noa_promos').doc(String(id));
+      const doc = await ref.get();
+      if (doc.exists) await ref.update({ active: !doc.data().active });
+    }
+    async function nextPromoId() {
+      const list = await loadPromos();
+      return list.length ? Math.max(...list.map(p => p.id)) + 1 : 1;
+    }
 
     const promoList      = document.getElementById('promoList');
     const promoAlert     = document.getElementById('promoAlert');
@@ -784,13 +809,16 @@
       cancelPromoBtn.style.display = 'none';
     }
 
-    savePromoBtn.addEventListener('click', () => {
+    savePromoBtn.addEventListener('click', async () => {
       const name = pName.value.trim();
       if (!name) { showPromoAlert('Informe o nome da promoção.', 'error'); return; }
-      const list  = loadPromos();
-      const id    = pEditId.value ? parseInt(pEditId.value) : null;
+
+      savePromoBtn.disabled = true;
+      savePromoBtn.textContent = 'Salvando...';
+
+      const existingId = pEditId.value ? parseInt(pEditId.value) : null;
       const promo = {
-        id:            id || nextPromoId(list),
+        id:            existingId || await nextPromoId(),
         name,
         unit:          pUnit.value,
         img:           pImg.value.trim() || 'https://images.unsplash.com/photo-1529694157872-4e0c0f3b238b?w=600&q=80',
@@ -799,23 +827,19 @@
         description:   pDesc.value.trim(),
         active:        pActive.value === '1',
       };
-      if (id) {
-        const idx = list.findIndex(p => p.id === id);
-        if (idx >= 0) list.splice(idx, 1, promo);
-        showPromoAlert('Promoção atualizada!');
-      } else {
-        list.push(promo);
-        showPromoAlert('Promoção adicionada!');
-      }
-      savePromos(list);
+
+      await savePromo(promo);
+      showPromoAlert(existingId ? 'Promoção atualizada!' : 'Promoção adicionada!');
+
+      savePromoBtn.disabled = false;
       clearPromoForm();
-      renderPromoList();
+      await renderPromoList();
     });
 
     cancelPromoBtn.addEventListener('click', clearPromoForm);
 
-    function editPromo(id) {
-      const p = loadPromos().find(x => x.id === id);
+    async function editPromo(id) {
+      const p = (await loadPromos()).find(x => x.id === id);
       if (!p) return;
       pEditId.value = p.id;
       pImg.value = p.img;
@@ -833,20 +857,19 @@
       document.getElementById('promoFormTitle').scrollIntoView({ behavior: 'smooth' });
     }
 
-    function deletePromo(id) {
+    async function deletePromo(id) {
       if (!confirm('Excluir esta promoção?')) return;
-      savePromos(loadPromos().filter(p => p.id !== id));
-      renderPromoList();
+      await deletePromoDB(id);
+      await renderPromoList();
     }
 
-    function togglePromo(id) {
-      const list = loadPromos();
-      const p = list.find(x => x.id === id);
-      if (p) { p.active = !p.active; savePromos(list); renderPromoList(); }
+    async function togglePromo(id) {
+      await togglePromoDB(id);
+      await renderPromoList();
     }
 
-    function renderPromoList() {
-      const list = loadPromos();
+    async function renderPromoList() {
+      const list = await loadPromos();
       if (!list.length) {
         promoList.innerHTML = '<div class="empty-list">Nenhuma promoção cadastrada ainda.</div>';
         return;
