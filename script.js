@@ -291,7 +291,9 @@
     let hasPrice   = false;
 
     cartBody.innerHTML = cart.map(item => {
-      const prod = products.find(p => p.id === item.id);
+      // look up in catalog products OR promo virtual products
+      const prod = products.find(p => p.id === item.id)
+                || (window._promoProducts && window._promoProducts[item.id]);
       if (!prod) return '';
       const unitL = UNIT_LABEL[prod.unit] || prod.unit;
       let priceHtml = '';
@@ -322,11 +324,12 @@
     // bind qty btns inside cart
     cartBody.querySelectorAll('.qty-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        const id  = parseInt(btn.dataset.id);
+        const id  = btn.dataset.id;
         const act = btn.dataset.act;
         const cur = getCartQty(id);
         setCartQty(id, act === 'plus' ? cur + 1 : cur - 1);
-        renderQtyBlock(id);
+        renderQtyBlock(parseInt(id) || id);
+        renderPromoQty && renderPromoQty(id);
         updateCartDrawer();
       });
     });
@@ -338,7 +341,8 @@
       const products = getProducts();
       if (!cart.length) return;
       const lines = cart.map(item => {
-        const prod = products.find(p => p.id === item.id);
+        const prod = products.find(p => p.id === item.id)
+                  || (window._promoProducts && window._promoProducts[item.id]);
         if (!prod) return null;
         const unitL = UNIT_LABEL[prod.unit] || prod.unit;
         const priceInfo = prod.price ? ` — R$ ${(prod.price * item.qty).toFixed(2).replace('.', ',')}` : '';
@@ -352,6 +356,215 @@
   // ── Init catalog & badge ──
   renderCatalog();
   updateCartBadge();
+
+  // ── Promoções da Semana ──
+  const LS_PROMOS = 'noa_promos';
+
+  function loadPromos() {
+    try { return JSON.parse(localStorage.getItem(LS_PROMOS)) || []; } catch { return []; }
+  }
+
+  const promosSection  = document.getElementById('promosSection');
+  const promoCarousel  = document.getElementById('promoCarousel');
+  const promoDots      = document.getElementById('promoDots');
+  const promoPrev      = document.getElementById('promoPrev');
+  const promoNext      = document.getElementById('promoNext');
+
+  let promoIndex    = 0;
+  let promoTotal    = 0;
+  let promoTimer    = null;
+  let promoItemW    = 0;
+
+  function renderPromos() {
+    if (!promosSection || !promoCarousel) return;
+    const active = loadPromos().filter(p => p.active);
+    promoTotal = active.length;
+
+    if (!promoTotal) { promosSection.style.display = 'none'; return; }
+    promosSection.style.display = '';
+
+    promoCarousel.innerHTML = active.map(p => {
+      const unitL = UNIT_LABEL[p.unit] || p.unit;
+      const hasPromo = p.promoPrice !== null && p.promoPrice !== undefined && p.promoPrice !== '';
+      const hasOrig  = p.originalPrice !== null && p.originalPrice !== undefined && p.originalPrice !== '';
+      const qty = getCartQty('promo_' + p.id);
+      return `
+        <div class="promo-card" data-id="promo_${p.id}">
+          <div class="promo-img" style="background-image:url('${p.img}')">
+            <span class="promo-badge">Promoção</span>
+          </div>
+          <div class="promo-body">
+            <span class="promo-cat">${unitL}</span>
+            <h3 class="promo-name">${p.name}</h3>
+            ${p.description ? `<p class="promo-desc">${p.description}</p>` : ''}
+            <div class="promo-prices">
+              ${hasOrig ? `<span class="promo-original">R$ ${parseFloat(p.originalPrice).toFixed(2).replace('.', ',')}</span>` : ''}
+              ${hasPromo ? `<span class="promo-price">R$ ${parseFloat(p.promoPrice).toFixed(2).replace('.', ',')}<small>/${unitL}</small></span>` : (hasOrig ? '' : `<span class="promo-unit">${unitL}</span>`)}
+            </div>
+            <div class="catalog-qty ${qty > 0 ? 'has-qty' : ''}" id="qty-promo_${p.id}">
+              ${qty > 0 ? `
+                <button class="qty-btn" data-id="promo_${p.id}" data-act="minus">−</button>
+                <span class="qty-num">${qty}</span>
+                <button class="qty-btn" data-id="promo_${p.id}" data-act="plus">+</button>
+              ` : `
+                <button class="btn-add-cart" data-id="promo_${p.id}">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M12 5v14M5 12h14"/></svg>
+                  Adicionar
+                </button>
+              `}
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    // Store promo product info for cart
+    active.forEach(p => {
+      const existing = getProducts().find(x => x.id === ('promo_' + p.id));
+      if (!existing) {
+        // inject a virtual product into memory for cart display
+        window._promoProducts = window._promoProducts || {};
+        window._promoProducts['promo_' + p.id] = {
+          id: 'promo_' + p.id,
+          name: '🏷️ ' + p.name,
+          unit: p.unit,
+          price: p.promoPrice !== null && p.promoPrice !== undefined && p.promoPrice !== '' ? parseFloat(p.promoPrice) : null,
+          img: p.img,
+        };
+      }
+    });
+
+    // Build dots
+    if (promoDots) {
+      promoDots.innerHTML = active.map((_, i) =>
+        `<button class="promo-dot ${i === 0 ? 'active' : ''}" data-i="${i}" aria-label="Slide ${i+1}"></button>`
+      ).join('');
+      promoDots.querySelectorAll('.promo-dot').forEach(d => {
+        d.addEventListener('click', () => goToPromo(parseInt(d.dataset.i)));
+      });
+    }
+
+    promoIndex = 0;
+    bindPromoButtons();
+    updatePromoPosition();
+    startPromoTimer();
+  }
+
+  function bindPromoButtons() {
+    if (!promoCarousel) return;
+    promoCarousel.querySelectorAll('.btn-add-cart').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.id;
+        setCartQty(id, 1);
+        renderPromoQty(id);
+      });
+    });
+    promoCarousel.querySelectorAll('.qty-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id  = btn.dataset.id;
+        const act = btn.dataset.act;
+        const cur = getCartQty(id);
+        setCartQty(id, act === 'plus' ? cur + 1 : cur - 1);
+        renderPromoQty(id);
+      });
+    });
+  }
+
+  function renderPromoQty(id) {
+    const block = document.getElementById(`qty-${id}`);
+    if (!block) return;
+    const qty = getCartQty(id);
+    if (qty > 0) {
+      block.className = 'catalog-qty has-qty';
+      block.innerHTML = `
+        <button class="qty-btn" data-id="${id}" data-act="minus">−</button>
+        <span class="qty-num">${qty}</span>
+        <button class="qty-btn" data-id="${id}" data-act="plus">+</button>`;
+    } else {
+      block.className = 'catalog-qty';
+      block.innerHTML = `
+        <button class="btn-add-cart" data-id="${id}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M12 5v14M5 12h14"/></svg>
+          Adicionar
+        </button>`;
+    }
+    const addBtn = block.querySelector('.btn-add-cart');
+    if (addBtn) addBtn.addEventListener('click', () => { setCartQty(id, 1); renderPromoQty(id); });
+    block.querySelectorAll('.qty-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const act = btn.dataset.act;
+        const cur = getCartQty(id);
+        setCartQty(id, act === 'plus' ? cur + 1 : cur - 1);
+        renderPromoQty(id);
+      });
+    });
+  }
+
+  function goToPromo(i) {
+    promoIndex = Math.max(0, Math.min(i, promoTotal - 1));
+    updatePromoPosition();
+    resetPromoTimer();
+  }
+
+  function updatePromoPosition() {
+    if (!promoCarousel) return;
+    const cards = promoCarousel.querySelectorAll('.promo-card');
+    if (!cards.length) return;
+    promoItemW = cards[0].offsetWidth + parseInt(getComputedStyle(promoCarousel).gap || 0);
+    const visibleCount = Math.round(promoCarousel.offsetWidth / promoItemW) || 1;
+    const maxIndex = Math.max(0, promoTotal - visibleCount);
+    const clampedIndex = Math.min(promoIndex, maxIndex);
+    promoCarousel.style.transform = `translateX(-${clampedIndex * promoItemW}px)`;
+    // update dots
+    if (promoDots) {
+      promoDots.querySelectorAll('.promo-dot').forEach((d, i) => {
+        d.classList.toggle('active', i === promoIndex);
+      });
+    }
+    // show/hide arrows
+    if (promoPrev) promoPrev.style.opacity = promoIndex <= 0 ? '0.3' : '1';
+    if (promoNext) promoNext.style.opacity = promoIndex >= maxIndex ? '0.3' : '1';
+  }
+
+  function startPromoTimer() {
+    if (promoTotal <= 1) return;
+    promoTimer = setInterval(() => {
+      const cards = promoCarousel ? promoCarousel.querySelectorAll('.promo-card') : [];
+      const visibleCount = promoItemW > 0 ? Math.round(promoCarousel.offsetWidth / promoItemW) || 1 : 1;
+      const maxIndex = Math.max(0, promoTotal - visibleCount);
+      promoIndex = promoIndex >= maxIndex ? 0 : promoIndex + 1;
+      updatePromoPosition();
+    }, 4500);
+  }
+
+  function resetPromoTimer() {
+    clearInterval(promoTimer);
+    startPromoTimer();
+  }
+
+  if (promoPrev) promoPrev.addEventListener('click', () => { goToPromo(promoIndex - 1); });
+  if (promoNext) promoNext.addEventListener('click', () => { goToPromo(promoIndex + 1); });
+
+  // Touch swipe on carousel
+  if (promoCarousel) {
+    let tsX = 0;
+    promoCarousel.addEventListener('touchstart', e => { tsX = e.touches[0].clientX; }, { passive: true });
+    promoCarousel.addEventListener('touchend', e => {
+      const dx = tsX - e.changedTouches[0].clientX;
+      if (Math.abs(dx) > 40) dx > 0 ? goToPromo(promoIndex + 1) : goToPromo(promoIndex - 1);
+    }, { passive: true });
+  }
+
+  // Patch getProducts to include promo virtual entries for cart drawer
+  const _origGetProducts = getProducts;
+  function getProductsWithPromos() {
+    const base = _origGetProducts();
+    const extras = Object.values(window._promoProducts || {});
+    return [...base, ...extras];
+  }
+
+  renderPromos();
+  window.addEventListener('storage', () => { renderPromos(); });
+
 
   // ===== PARALLAX on hero (desktop only) =====
   const hero = document.querySelector('.hero');

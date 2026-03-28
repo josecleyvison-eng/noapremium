@@ -46,6 +46,32 @@
     </div>
   </section>
 
+  <!-- ===== PROMOÇÕES DA SEMANA ===== -->
+  <section class="promos-section" id="promosSection" style="display:none">
+    <div class="container">
+      <div class="section-header center promos-header">
+        <p class="section-label">Só essa semana</p>
+        <h2 class="section-title">Promoções <em>especiais</em></h2>
+      </div>
+
+      <div class="promo-carousel-wrap">
+        <button class="promo-arrow promo-prev" id="promoPrev" aria-label="Anterior">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+
+        <div class="promo-carousel" id="promoCarousel">
+          <!-- cards gerados via JS -->
+        </div>
+
+        <button class="promo-arrow promo-next" id="promoNext" aria-label="Próximo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+
+      <div class="promo-dots" id="promoDots"></div>
+    </div>
+  </section>
+
   <!-- ===== CATÁLOGO ===== -->
   <section class="catalogo" id="catalogo">
     <div class="container">

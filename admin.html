@@ -373,6 +373,84 @@
         </div>
 
       </div>
+
+      <!-- ===== PROMOÇÕES DA SEMANA ===== -->
+      <div style="margin-top: 2.5rem;">
+        <div class="card">
+          <h3>Promoções da Semana</h3>
+          <div class="alert" id="promoAlert"></div>
+          <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:1.4rem;">As promoções ativas aparecem em carrossel no topo do catálogo. Ative ou desative com um clique.</p>
+
+          <div id="promoList" class="prod-list">
+            <div class="empty-list">Nenhuma promoção cadastrada ainda.</div>
+          </div>
+
+          <div style="margin-top:1.5rem;padding-top:1.2rem;border-top:1px solid var(--border);">
+            <h4 style="font-family:'Playfair Display',serif;font-size:1rem;color:var(--gold);margin-bottom:1.2rem;" id="promoFormTitle">Nova Promoção</h4>
+            <input type="hidden" id="pEditId" />
+
+            <div class="img-preview" id="pImgPreview"><span>Pré-visualização</span></div>
+
+            <div class="field">
+              <label>Imagem</label>
+              <div style="display:flex;gap:0.5rem;align-items:stretch;">
+                <input type="url" id="pImg" placeholder="URL ou upload" style="flex:1" />
+                <label class="btn btn-gold btn-sm" style="cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:0.4rem;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  Upload
+                  <input type="file" id="pImgFile" accept="image/*" style="display:none" />
+                </label>
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Nome *</label>
+              <input type="text" id="pName" placeholder="Ex: Picanha Especial..." />
+            </div>
+
+            <div class="form-row">
+              <div class="field">
+                <label>Unidade</label>
+                <select id="pUnit">
+                  <option value="kg">Por kg</option>
+                  <option value="unidade">Por unidade</option>
+                  <option value="pacote">Por pacote</option>
+                  <option value="bandeja">Por bandeja</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Preço original (R$)</label>
+                <input type="number" id="pOriginalPrice" min="0" step="0.01" placeholder="De: 0,00" />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="field">
+                <label>Preço promocional (R$)</label>
+                <input type="number" id="pPromoPrice" min="0" step="0.01" placeholder="Por: 0,00" />
+              </div>
+              <div class="field">
+                <label>Status</label>
+                <select id="pActive">
+                  <option value="1">Ativa ✓</option>
+                  <option value="0">Desativada</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Descrição</label>
+              <textarea id="pDesc" placeholder="Detalhe da promoção..." style="min-height:60px;"></textarea>
+            </div>
+
+            <div style="display:flex;gap:0.6rem;margin-top:0.5rem;">
+              <button class="btn btn-red" id="savePromoBtn" style="flex:1">Salvar Promoção</button>
+              <button class="btn btn-gold btn-sm" id="cancelPromoBtn" style="display:none">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -396,6 +474,7 @@
         loginScreen.style.display = 'none';
         adminWrap.style.display = 'block';
         renderList();
+        renderPromoList();
       }
     }
 
@@ -406,6 +485,7 @@
         loginScreen.style.display = 'none';
         adminWrap.style.display = 'block';
         renderList();
+        renderPromoList();
       } else {
         loginErr.textContent = 'Senha incorreta. Tente novamente.';
         loginPass.value = '';
@@ -631,6 +711,170 @@
 
     // expose to inline handlers
     window.adminActions = { edit: editProduct, del: deleteProduct, toggle: toggleActive };
+
+    // ── PROMOÇÕES DA SEMANA ──────────────────────────────
+    const LS_PROMOS = 'noa_promos';
+
+    function loadPromos() {
+      try { return JSON.parse(localStorage.getItem(LS_PROMOS)) || []; } catch { return []; }
+    }
+    function savePromos(list) { localStorage.setItem(LS_PROMOS, JSON.stringify(list)); }
+    function nextPromoId(list) { return list.length ? Math.max(...list.map(p => p.id)) + 1 : 1; }
+
+    const promoList      = document.getElementById('promoList');
+    const promoAlert     = document.getElementById('promoAlert');
+    const promoFormTitle = document.getElementById('promoFormTitle');
+    const pEditId        = document.getElementById('pEditId');
+    const pImg           = document.getElementById('pImg');
+    const pImgFile       = document.getElementById('pImgFile');
+    const pImgPreview    = document.getElementById('pImgPreview');
+    const pName          = document.getElementById('pName');
+    const pUnit          = document.getElementById('pUnit');
+    const pOriginalPrice = document.getElementById('pOriginalPrice');
+    const pPromoPrice    = document.getElementById('pPromoPrice');
+    const pActive        = document.getElementById('pActive');
+    const pDesc          = document.getElementById('pDesc');
+    const savePromoBtn   = document.getElementById('savePromoBtn');
+    const cancelPromoBtn = document.getElementById('cancelPromoBtn');
+
+    pImg.addEventListener('input', () => {
+      const url = pImg.value.trim();
+      pImgPreview.style.backgroundImage = url ? `url(${url})` : '';
+      pImgPreview.innerHTML = url ? '' : '<span>Pré-visualização</span>';
+    });
+
+    pImgFile.addEventListener('change', () => {
+      const file = pImgFile.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+          const MAX = 800;
+          let w = img.width, h = img.height;
+          if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          const b64 = canvas.toDataURL('image/jpeg', 0.82);
+          pImg.value = b64;
+          pImgPreview.style.backgroundImage = `url(${b64})`;
+          pImgPreview.innerHTML = '';
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+      pImgFile.value = '';
+    });
+
+    function showPromoAlert(msg, type = 'success') {
+      promoAlert.textContent = msg;
+      promoAlert.className = `alert ${type} show`;
+      setTimeout(() => { promoAlert.className = 'alert'; }, 3000);
+    }
+
+    function clearPromoForm() {
+      pEditId.value = '';
+      pImg.value = ''; pImgPreview.style.backgroundImage = ''; pImgPreview.innerHTML = '<span>Pré-visualização</span>';
+      pName.value = ''; pUnit.value = 'kg';
+      pOriginalPrice.value = ''; pPromoPrice.value = '';
+      pActive.value = '1'; pDesc.value = '';
+      promoFormTitle.textContent = 'Nova Promoção';
+      savePromoBtn.textContent = 'Salvar Promoção';
+      cancelPromoBtn.style.display = 'none';
+    }
+
+    savePromoBtn.addEventListener('click', () => {
+      const name = pName.value.trim();
+      if (!name) { showPromoAlert('Informe o nome da promoção.', 'error'); return; }
+      const list  = loadPromos();
+      const id    = pEditId.value ? parseInt(pEditId.value) : null;
+      const promo = {
+        id:            id || nextPromoId(list),
+        name,
+        unit:          pUnit.value,
+        img:           pImg.value.trim() || 'https://images.unsplash.com/photo-1529694157872-4e0c0f3b238b?w=600&q=80',
+        originalPrice: pOriginalPrice.value !== '' ? parseFloat(pOriginalPrice.value) : null,
+        promoPrice:    pPromoPrice.value    !== '' ? parseFloat(pPromoPrice.value)    : null,
+        description:   pDesc.value.trim(),
+        active:        pActive.value === '1',
+      };
+      if (id) {
+        const idx = list.findIndex(p => p.id === id);
+        if (idx >= 0) list.splice(idx, 1, promo);
+        showPromoAlert('Promoção atualizada!');
+      } else {
+        list.push(promo);
+        showPromoAlert('Promoção adicionada!');
+      }
+      savePromos(list);
+      clearPromoForm();
+      renderPromoList();
+    });
+
+    cancelPromoBtn.addEventListener('click', clearPromoForm);
+
+    function editPromo(id) {
+      const p = loadPromos().find(x => x.id === id);
+      if (!p) return;
+      pEditId.value = p.id;
+      pImg.value = p.img;
+      pImgPreview.style.backgroundImage = `url(${p.img})`;
+      pImgPreview.innerHTML = '';
+      pName.value = p.name;
+      pUnit.value = p.unit || 'kg';
+      pOriginalPrice.value = p.originalPrice != null ? p.originalPrice : '';
+      pPromoPrice.value    = p.promoPrice    != null ? p.promoPrice    : '';
+      pActive.value = p.active ? '1' : '0';
+      pDesc.value = p.description || '';
+      promoFormTitle.textContent = 'Editar Promoção';
+      savePromoBtn.textContent = 'Atualizar Promoção';
+      cancelPromoBtn.style.display = 'inline-flex';
+      document.getElementById('promoFormTitle').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function deletePromo(id) {
+      if (!confirm('Excluir esta promoção?')) return;
+      savePromos(loadPromos().filter(p => p.id !== id));
+      renderPromoList();
+    }
+
+    function togglePromo(id) {
+      const list = loadPromos();
+      const p = list.find(x => x.id === id);
+      if (p) { p.active = !p.active; savePromos(list); renderPromoList(); }
+    }
+
+    function renderPromoList() {
+      const list = loadPromos();
+      if (!list.length) {
+        promoList.innerHTML = '<div class="empty-list">Nenhuma promoção cadastrada ainda.</div>';
+        return;
+      }
+      const UNIT_LBL = { kg: 'kg', unidade: 'unidade', pacote: 'pacote', bandeja: 'bandeja' };
+      promoList.innerHTML = list.map(p => `
+        <div class="prod-item">
+          <div class="prod-thumb" style="background-image:url(${p.img})"></div>
+          <div class="prod-info">
+            <div class="prod-name">${p.name}</div>
+            <div class="prod-meta">
+              ${UNIT_LBL[p.unit] || p.unit}
+              ${p.originalPrice != null ? ` · De R$ ${parseFloat(p.originalPrice).toFixed(2).replace('.', ',')}` : ''}
+              ${p.promoPrice    != null ? ` · Por R$ ${parseFloat(p.promoPrice).toFixed(2).replace('.', ',')}` : ''}
+            </div>
+          </div>
+          <div class="prod-actions">
+            <button class="toggle-active ${p.active ? 'on' : 'off'}" onclick="promoActions.toggle(${p.id})">
+              <span class="toggle-dot"></span>${p.active ? 'Ativa' : 'Off'}
+            </button>
+            <button class="btn btn-gold btn-sm" onclick="promoActions.edit(${p.id})">Editar</button>
+            <button class="btn btn-danger" onclick="promoActions.del(${p.id})">Excluir</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    window.promoActions = { edit: editPromo, del: deletePromo, toggle: togglePromo };
 
     // ── Init ───────────────────────────────────────────
     checkSession();
